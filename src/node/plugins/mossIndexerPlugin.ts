@@ -35,7 +35,10 @@ export async function mossIndexerPlugin(
 
         // Validate required credentials
         if (!projectId || !projectKey || !indexName) {
-          throw new Error('Missing Moss configuration: projectId, projectKey, and indexName must be provided in themeConfig.search.options')
+          throw new Error(
+            'Missing Moss configuration: projectId, projectKey, and indexName must be provided in themeConfig.search.options. ' +
+            'Example: search: { provider: "moss", options: { projectId: "...", projectKey: "...", indexName: "..." } }'
+          )
         }
 
         const creds = {
