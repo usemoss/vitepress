@@ -113,12 +113,13 @@ export default defineConfig({
     ],
 
     search: {
-      provider: 'algolia',
+      provider: 'moss',
       options: {
-        appId: '8J64VVRP8K',
-        apiKey: '52f578a92b88ad6abde815aae2b0ad7c',
-        indexName: 'vitepress',
-        askAi: 'YaVSonfX5bS8'
+        projectId: 'bb56c6d2-d2f6-455c-a88b-b66914f3fef6',
+        projectKey: 'moss_t5Sy4mpBHHgRtgOoFDwU8DXDZvTqkkeU',
+        indexName: 'VitePress-Docs-Demo-en',
+        topk: 6,
+        MaxMatchPerPage: 2
       }
     },
 

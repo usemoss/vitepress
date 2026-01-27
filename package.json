@@ -98,7 +98,7 @@
     "@docsearch/css": "^4.3.2",
     "@docsearch/js": "^4.3.2",
     "@iconify-json/simple-icons": "^1.2.59",
-    "@inferedge/moss": "latest",
+    "@inferedge/moss": "1.0.0-beta.3",
     "@shikijs/core": "^3.15.0",
     "@shikijs/transformers": "^3.15.0",
     "@shikijs/types": "^3.15.0",
@@ -116,7 +116,7 @@
     "vue": "^3.5.24"
   },
   "devDependencies": {
-    "vitepress-moss-search-indexer": "file:./vitepress-moss-search-indexer-1.0.0-beta.2.tgz",
+    "@moss-tools/md-indexer": "file:/Users/yatharthkapadia/Desktop/code/moss-utils/moss-md-indexer",
     "dotenv": "^16.4.5",
     "@clack/prompts": "^1.0.0-alpha.6",
     "@iconify/utils": "^3.0.2",

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, nextTick, watch, onBeforeUnmount, onMounted } from 'vue'
-import { useData, useRouter, withBase } from 'vitepress'
+import { useData, useRouter } from 'vitepress'
 import { onKeyStroke, useScrollLock, useInfiniteScroll } from '@vueuse/core'
 import { useFocusTrap } from '@vueuse/integrations/useFocusTrap'
 import type { SearchResult, QueryResultDocumentInfo } from '@inferedge/moss'
+import mossLogo from '../assets/InferEdgeLogo_Dark_Icon.png'
 
 // ---------Metadata structure for Search Results-----------
 interface MossMetadata {
@@ -553,23 +554,37 @@ function scrollToActive() {
 }
 
 // --------- Initialize Moss Client Function -----------
-// Initializes the Moss client and loads the search index
+// Initializes the Moss client and starts loading the search index in the background
+// The client can handle queries immediately - it will use cloud fallback until local index is ready
 async function initMoss() {
   if (mossClient.value || initPromise) return initPromise
   status.value = 'initializing'
   initPromise = (async () => {
     try {
+      // Polyfill process.env for Moss SDK if it doesn't exist
+      if (typeof process === 'undefined') {
+        (globalThis as any).process = { env: {} }
+      }
       const { MossClient } = await import('@inferedge/moss')
       const client = new MossClient((options.value as any).projectId, (options.value as any).projectKey)
       const indexName = (options.value as any).indexName
-      await client.loadIndex(indexName)
-      // Warm up the client by querying the config index, this initializes the model download
-      try { await client.query(indexName, 'config', 1) } catch {}
+
+      // Make client available immediately for queries (will use cloud fallback)
       mossClient.value = client
       status.value = 'ready'
+
+      // Load index in background - queries will automatically switch to local once ready
+      const loadStart = performance?.now?.() ?? Date.now()
+      client.loadIndex(indexName).then(() => {
+        const loadTime = Math.round(((performance?.now?.() ?? Date.now()) - loadStart))
+        console.log(`[Moss] ✓ Local index loaded successfully in ${loadTime}ms - queries will now run locally`)
+      }).catch(e => {
+        console.warn('[Moss] Failed to load local index, will continue using cloud fallback:', e)
+      })
     } catch (e) {
       status.value = 'error'
-      errorMessage.value = 'Failed to load search index.'
+      console.error('Failed to initialize Moss client:', e)
+      errorMessage.value = `Failed to initialize search: ${e instanceof Error ? e.message : String(e)}`
       initPromise = null
       throw e
     }
@@ -818,7 +833,7 @@ onKeyStroke('Enter', (e) => {
               <li><kbd class="Moss-Key">↓</kbd><kbd class="Moss-Key">↑</kbd><span class="Moss-Label">navigate</span></li>
               <li><kbd class="Moss-Key">esc</kbd><span class="Moss-Label">close</span></li>
             </ul>
-            <div class="Moss-Logo"><span>Search by</span><div class="MossBrand-Container"><img :src="withBase('/InferEdgeLogo_Dark_Icon.png')" class="MossBrand-Logo" /><span class="MossBrand-Text">Moss</span></div></div>
+            <div class="Moss-Logo"><span>Search by</span><div class="MossBrand-Container"><img :src="mossLogo" class="MossBrand-Logo" /><span class="MossBrand-Text">Moss</span></div></div>
           </footer>
         </div>
       </div>
