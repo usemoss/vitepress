@@ -74,7 +74,7 @@ let lastQueryToken = 0       // To track network requests
 let processingToken = 0      // To track/cancel local processing
 
 // --------- Performance Profiling -----------
-const ENABLE_PROFILING = true // Set to false in production
+const ENABLE_PROFILING = false // Set to true for debugging
 let currentProfile: {
   query: string
   inputTime: number
@@ -265,7 +265,7 @@ function escapeHtml(str: string) {
 }
 
 // --------- Log Moss Results Function -----------
-// Remove this function in production
+// This function is only called when ENABLE_PROFILING is true
 function logMossResults(query: string, startedAt: number, response: SearchResult | unknown) {
   const elapsed = Math.round(((performance?.now?.() ?? Date.now()) - startedAt))
   const docs = Array.isArray((response as any)?.docs) ? (response as any).docs : []
@@ -574,13 +574,19 @@ async function initMoss() {
       status.value = 'ready'
 
       // Load index in background - queries will automatically switch to local once ready
-      const loadStart = performance?.now?.() ?? Date.now()
-      client.loadIndex(indexName).then(() => {
-        const loadTime = Math.round(((performance?.now?.() ?? Date.now()) - loadStart))
-        console.log(`[Moss] ✓ Local index loaded successfully in ${loadTime}ms - queries will now run locally`)
-      }).catch(e => {
-        console.warn('[Moss] Failed to load local index, will continue using cloud fallback:', e)
-      })
+      if (ENABLE_PROFILING) {
+        const loadStart = performance?.now?.() ?? Date.now()
+        client.loadIndex(indexName).then(() => {
+          const loadTime = Math.round(((performance?.now?.() ?? Date.now()) - loadStart))
+          console.log(`[Moss] ✓ Local index loaded successfully in ${loadTime}ms - queries will now run locally`)
+        }).catch(e => {
+          console.warn('[Moss] Failed to load local index, will continue using cloud fallback:', e)
+        })
+      } else {
+        client.loadIndex(indexName).catch(() => {
+          // Silently fall back to cloud if local index fails to load
+        })
+      }
     } catch (e) {
       status.value = 'error'
       console.error('Failed to initialize Moss client:', e)
@@ -647,7 +653,9 @@ const performSearch = async (q: string) => {
     
     // Set raw results, then trigger the Async Processor
     rawResults.value = Array.isArray(response?.docs) ? response.docs : []
-    logMossResults(currentQuery, searchStart, response)
+    if (ENABLE_PROFILING) {
+      logMossResults(currentQuery, searchStart, response)
+    }
     updateDisplayGroups() // <--- Trigger the non-blocking processor
     
     selectedIndex.value = 0
@@ -833,7 +841,7 @@ onKeyStroke('Enter', (e) => {
               <li><kbd class="Moss-Key">↓</kbd><kbd class="Moss-Key">↑</kbd><span class="Moss-Label">navigate</span></li>
               <li><kbd class="Moss-Key">esc</kbd><span class="Moss-Label">close</span></li>
             </ul>
-            <div class="Moss-Logo"><span>Search by</span><div class="MossBrand-Container"><img :src="mossLogo" class="MossBrand-Logo" /><span class="MossBrand-Text">Moss</span></div></div>
+            <div class="Moss-Logo"><span>Search by</span><div class="MossBrand-Container"><img :src="mossLogo" alt="InferEdge Moss logo" class="MossBrand-Logo" /><span class="MossBrand-Text">Moss</span></div></div>
           </footer>
         </div>
       </div>
