@@ -559,10 +559,6 @@ async function initMoss() {
   status.value = 'initializing'
   initPromise = (async () => {
     try {
-      // Polyfill process.env for Moss SDK if it doesn't exist
-      if (typeof process === 'undefined') {
-        (globalThis as any).process = { env: {} }
-      }
       const { MossClient } = await import('@inferedge/moss')
       const client = new MossClient((options.value as any).projectId, (options.value as any).projectKey)
       const indexName = (options.value as any).indexName

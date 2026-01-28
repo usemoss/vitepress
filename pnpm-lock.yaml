@@ -36,8 +36,8 @@ importers:
         specifier: ^1.2.59
         version: 1.2.59
       '@inferedge/moss':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3
+        specifier: 1.0.0-beta.4
+        version: 1.0.0-beta.4
       '@shikijs/core':
         specifier: ^3.15.0
         version: 3.15.0
@@ -758,8 +758,8 @@ packages:
   '@inferedge-rest/moss@1.0.0-beta.3':
     resolution: {integrity: sha512-0EsqtouvVlFtOpFKJvrNB/WDFVmWpA7AuCx8pXkJVa0tg3DDGOPglq8U0y6TLygi6ZAr91vOawnm5B8p0j/uLA==}
 
-  '@inferedge/moss@1.0.0-beta.3':
-    resolution: {integrity: sha512-auN7dg8z4m+gez1+AbEesY8XLEerzkZWU3WeU4iySimK/2SRPD+jk875Cgsjb0y4NGsPT2Jxn/7ELfNq2akhgA==}
+  '@inferedge/moss@1.0.0-beta.4':
+    resolution: {integrity: sha512-rB++NhldMXtU06gAzWngCkOJEplX4qTjoyNHx8qz0kak3QPl24CeUnvw001K7FfBeLFNNv7RspAFmwSMCVHC/A==}
 
   '@isaacs/balanced-match@4.0.1':
     resolution: {integrity: sha512-yzMTt9lEb8Gv7zRioUilSglI0c0smZ9k5D65677DLWLtWJaXIS3CqcGyUFByYKlnUj6TkjLVs54fBl6+TiGQDQ==}
@@ -4173,7 +4173,7 @@ snapshots:
 
   '@inferedge-rest/moss@1.0.0-beta.3': {}
 
-  '@inferedge/moss@1.0.0-beta.3':
+  '@inferedge/moss@1.0.0-beta.4':
     dependencies:
       '@huggingface/transformers': 3.8.0
 
