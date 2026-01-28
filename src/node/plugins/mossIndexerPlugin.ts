@@ -23,7 +23,7 @@ export async function mossIndexerPlugin(
       // Only run for client build (VitePress builds both client and server bundles)
       if (this.environment.name !== 'client') return
       try {
-        debug('🔍 Starting Moss index sync...')
+        debug('Starting Moss index sync...')
 
         const searchConfig = siteConfig.site.themeConfig?.search
         const searchOptions = searchConfig?.provider === 'moss' ? searchConfig.options : undefined

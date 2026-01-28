@@ -56,7 +56,7 @@ const searchInput = ref<HTMLInputElement>()
 
 // Split Input vs Search State
 const inputValue = ref('')        // Bound to <input> (Instant updates)
-const searchQuery = ref('')       // Triggers the search logic (Debounced)
+const searchQuery = ref('')       // Triggers the search logic
 
 const rawResults = shallowRef<QueryResultDocumentInfo[]>([])
 const displayGroups = shallowRef<GroupVM[]>([])
@@ -71,7 +71,6 @@ const isMounted = ref(false)
 const mossClient = shallowRef<any>(null)
 let initPromise: Promise<void> | null = null
 let lastQueryToken = 0       // To track network requests
-let processingToken = 0      // To track/cancel local processing
 
 // --------- Performance Profiling -----------
 const ENABLE_PROFILING = false // Set to true for debugging
@@ -246,10 +245,11 @@ watch(inputValue, () => {
 })
 
 // --------- Read Max Match Per Page -----------
-const maxMatchPerPage = computed(() => (options.value as any).MaxMatchPerPage ?? 2) // Algolia-style distinct limit per doc
+const maxMatchPerPage = computed(() => (options.value as any).MaxMatchPerPage ?? 2) // distinct limit per doc
 
 
 // --------- Escape HTML Function -----------
+// Simple HTML escape to prevent XSS in snippets and breadcrumbs
 function escapeHtml(str: string) {
   const start = ENABLE_PROFILING ? getTime() : 0
   const result = str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -290,20 +290,17 @@ function logMossResults(query: string, startedAt: number, response: SearchResult
 // -----------------------------------------
 
 
-// --------- Async Processing Loop for current search query -----------
-// Starts a new processing loop for the current search query, cancels any previous loop.
+// --------- Processing Function for current search query -----------
 // Takes raw results and returns ui ready groups and navigation list.
-async function updateDisplayGroups() {
-  // Cancel any previous processing loop
-  const token = ++processingToken
-  
+function updateDisplayGroups() {
   const results = rawResults.value
   const q = searchQuery.value.trim()
-  
+
   // Exit early if no query or no results
   if (!q || results.length === 0) {
     displayGroups.value = []
     flatNavigationList.value = []
+    selectedIndex.value = 0
     return
   }
 
@@ -318,7 +315,7 @@ async function updateDisplayGroups() {
   const safeQueryForRegex = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${safeQueryForRegex})`, 'gi')
 
-  // 2. builds a highlighted excerpt around the query, for keyword matching ui 
+  // 2. builds a highlighted excerpt around the query, for keyword matching ui
   const generateSnippet = (text: string): string => {
     const snippetStartTime = ENABLE_PROFILING ? getTime() : 0
     if (!text) return ''
@@ -356,7 +353,7 @@ async function updateDisplayGroups() {
     let start = Math.max(0, matchIndex - 20)
     let end = Math.min(text.length, matchIndex + q.length + 100)
     let snippet = text.slice(start, end)
-    
+
     if (start > 0) snippet = '...' + snippet
     if (end < text.length) snippet = snippet + '...'
 
@@ -388,97 +385,84 @@ async function updateDisplayGroups() {
     return result
   }
 
-  // 3. Process in Chunks (Time Slicing)
-  // builds ResultItemVMs for each search hit and Groups
+  // 3. Build ResultItemVMs for each search hit and Groups
   const map = new Map<string, GroupVM>()
   // Track navigation links per group to prevent duplicates
   const navigationLinksPerGroup = new Map<string, Set<string>>()
-  const CHUNK_SIZE = 10 // Process 10 items at a time
-  
-  for (let i = 0; i < results.length; i += CHUNK_SIZE) {
-    // Check cancellation
-    if (token !== processingToken) return 
 
-    // Process a batch
-    const chunk = results.slice(i, i + CHUNK_SIZE)
-    
-    chunk.forEach(item => {
-      const meta = item.metadata as unknown as MossMetadata
-      const groupId = meta.groupId
-      const navigation = meta.navigation || item.id
+  results.forEach(item => {
+    const meta = item.metadata as unknown as MossMetadata
+    const groupId = meta.groupId
+    const navigation = meta.navigation || item.id
 
-      // Initialize navigation tracking for this group if needed
-      if (!navigationLinksPerGroup.has(groupId)) {
-        navigationLinksPerGroup.set(groupId, new Set())
-      }
-      const usedNavigationLinks = navigationLinksPerGroup.get(groupId)!
+    // Initialize navigation tracking for this group if needed
+    if (!navigationLinksPerGroup.has(groupId)) {
+      navigationLinksPerGroup.set(groupId, new Set())
+    }
+    const usedNavigationLinks = navigationLinksPerGroup.get(groupId)!
 
-      // Skip if this navigation link has already been used in this group
-      if (usedNavigationLinks.has(navigation)) {
-        return
-      }
-      
-      // Generate breadcrumb based on type and available metadata
-      let breadcrumb = ''
-      if (meta.type !== 'page') {
-        // Prefer displayBreadcrumb, then title, then type-specific labels
-        breadcrumb = meta.displayBreadcrumb || meta.title || (() => {
-          switch (meta.type) {
-            case 'header': return 'Heading'
-            case 'code': return 'Code Block'
-            case 'text': return 'Text'
-            default: return 'Section'
-          }
-        })()
-      }
-      const breadcrumbHtml = breadcrumb ? highlightBreadcrumb(breadcrumb) : ''
+    // Skip if this navigation link has already been used in this group
+    if (usedNavigationLinks.has(navigation)) {
+      return
+    }
 
-      if (!map.has(groupId)) {
-        map.set(groupId, { 
-          title: meta.groupTitle || 'Documentation', 
-          path: groupId, 
-          headerMatch: null, 
-          children: [] 
-        })
-      }
-
-      const group = map.get(groupId)!
-      // Distinct logic: cap children per group to avoid spam from one doc
-      const maxChildren = maxMatchPerPage.value
-      if (meta.type !== 'page' && group.children.length >= maxChildren) {
-        return
-      }
-      // Generate highlighted title for page items
-      const titleText = meta.groupTitle || meta.title || 'Documentation'
-      const titleHtml = highlightBreadcrumb(titleText)
-      
-      const vmItem: Partial<ResultItemVM> = {
-        id: item.id,
-        data: item,
-        breadcrumb,
-        breadcrumbHtml,
-        htmlSnippet: generateSnippet(meta.sanitizedText || item.text || ''),
-        titleHtml,
-        navigation,
-        type: meta.type || 'text'
-      }
-
-      if (meta.type === 'page') {
-        if (!group.headerMatch) {
-          group.headerMatch = vmItem as ResultItemVM
-          usedNavigationLinks.add(navigation)
+    // Generate breadcrumb based on type and available metadata
+    let breadcrumb = ''
+    if (meta.type !== 'page') {
+      // Prefer displayBreadcrumb, then title, then type-specific labels
+      breadcrumb = meta.displayBreadcrumb || meta.title || (() => {
+        switch (meta.type) {
+          case 'header': return 'Heading'
+          case 'code': return 'Code Block'
+          case 'text': return 'Text'
+          default: return 'Section'
         }
-      } else {
-        if (group.children.length < maxMatchPerPage.value) {
-          group.children.push(vmItem as ResultItemVM)
-          usedNavigationLinks.add(navigation)
-        }
-      }
-    })
+      })()
+    }
+    const breadcrumbHtml = breadcrumb ? highlightBreadcrumb(breadcrumb) : ''
 
-    // Yield to Main Thread to allow UI updates/rendering
-    await new Promise(resolve => setTimeout(resolve, 0))
-  }
+    if (!map.has(groupId)) {
+      map.set(groupId, {
+        title: meta.groupTitle || 'Documentation',
+        path: groupId,
+        headerMatch: null,
+        children: []
+      })
+    }
+
+    const group = map.get(groupId)!
+    // Distinct logic: cap children per group to avoid spam from one doc
+    const maxChildren = maxMatchPerPage.value
+    if (meta.type !== 'page' && group.children.length >= maxChildren) {
+      return
+    }
+    // Generate highlighted title for page items
+    const titleText = meta.groupTitle || meta.title || 'Documentation'
+    const titleHtml = highlightBreadcrumb(titleText)
+
+    const vmItem: Partial<ResultItemVM> = {
+      id: item.id,
+      data: item,
+      breadcrumb,
+      breadcrumbHtml,
+      htmlSnippet: generateSnippet(meta.sanitizedText || item.text || ''),
+      titleHtml,
+      navigation,
+      type: meta.type || 'text'
+    }
+
+    if (meta.type === 'page') {
+      if (!group.headerMatch) {
+        group.headerMatch = vmItem as ResultItemVM
+        usedNavigationLinks.add(navigation)
+      }
+    } else {
+      if (group.children.length < maxMatchPerPage.value) {
+        group.children.push(vmItem as ResultItemVM)
+        usedNavigationLinks.add(navigation)
+      }
+    }
+  })
 
   // 4. Final Indexing Pass
   let runningIndex = 0
@@ -496,25 +480,28 @@ async function updateDisplayGroups() {
     })
   })
 
-  // Update UI state
-  if (token === processingToken) {
-    const processingEnd = ENABLE_PROFILING ? getTime() : 0
-    if (ENABLE_PROFILING && currentProfile) {
-      currentProfile.processingEndTime = processingEnd
-    }
-    
-    displayGroups.value = groups
-    flatNavigationList.value = navList
-    status.value = 'ready'
-    
-    // Wait for next tick to ensure visibleGroups has computed
-    if (ENABLE_PROFILING && currentProfile) {
-      nextTick(() => {
-        const totalEnd = getTime()
-        currentProfile!.totalTime = totalEnd - currentProfile!.inputTime
-        logProfile()
-      })
-    }
+  const processingEnd = ENABLE_PROFILING ? getTime() : 0
+  if (ENABLE_PROFILING && currentProfile) {
+    currentProfile.processingEndTime = processingEnd
+  }
+
+  displayGroups.value = groups
+  flatNavigationList.value = navList
+
+  // Reset selectedIndex if it's out of bounds for the new results
+  if (selectedIndex.value >= navList.length) {
+    selectedIndex.value = Math.max(0, navList.length - 1)
+  }
+
+  status.value = 'ready'
+
+  // Wait for next tick to ensure visibleGroups has computed
+  if (ENABLE_PROFILING && currentProfile) {
+    nextTick(() => {
+      const totalEnd = getTime()
+      currentProfile!.totalTime = totalEnd - currentProfile!.inputTime
+      logProfile()
+    })
   }
 }
 
@@ -537,10 +524,21 @@ function getTypeIcon(type: 'page' | 'header' | 'text' | 'code') {
 // --------- Handle Select Function -----------
 // Handles the selection of a search result item
 function handleSelect(index: number) {
+  // Bounds check to prevent out-of-bounds access
+  if (index < 0 || index >= flatNavigationList.value.length) {
+    return
+  }
+
   const item = flatNavigationList.value[index]
+
   if (item?.path) {
-    router.go(item.path)
-    emit('close')
+    try {
+      router.go(item.path)
+      emit('close')
+    } catch (error) {
+      console.error('Navigation failed:', error)
+      // Don't close modal if navigation fails
+    }
   }
 }
 
@@ -607,6 +605,7 @@ const performSearch = async (q: string) => {
     rawResults.value = []
     displayGroups.value = []
     flatNavigationList.value = []
+    selectedIndex.value = 0
     status.value = 'ready'
     return
   }
@@ -708,6 +707,8 @@ function clearSearch() {
   searchQuery.value = ''
   rawResults.value = []
   displayGroups.value = []
+  flatNavigationList.value = []
+  selectedIndex.value = 0
   status.value = 'ready'
 }
 
@@ -757,7 +758,8 @@ onKeyStroke('ArrowUp', (e) => {
 onKeyStroke('ArrowDown', (e) => {
   if (!props.open) return
   e.preventDefault()
-  selectedIndex.value = Math.min(flatNavigationList.value.length - 1, selectedIndex.value + 1)
+  const maxIndex = Math.max(0, flatNavigationList.value.length - 1)
+  selectedIndex.value = Math.min(maxIndex, selectedIndex.value + 1)
   scrollToActive()
 })
 
@@ -792,7 +794,7 @@ onKeyStroke('Enter', (e) => {
   
           <div class="Moss-Dropdown" ref="dropdownEl">
             <div v-if="status === 'error'" class="Moss-State error">{{ errorMessage }}</div>
-            <div v-else-if="inputValue && flatNavigationList.length === 0 && status === 'ready' && inputValue === searchQuery" class="Moss-State">No results for "<span class="q-text">{{ inputValue }}</span>"</div>
+            <div v-else-if="inputValue.trim() && flatNavigationList.length === 0 && status === 'ready' && inputValue === searchQuery" class="Moss-State">No results for "<span class="q-text">{{ inputValue }}</span>"</div>
 
             <div class="Moss-Results" v-if="flatNavigationList.length > 0">
               <div v-for="group in visibleGroups" :key="group.path" class="Moss-Group">

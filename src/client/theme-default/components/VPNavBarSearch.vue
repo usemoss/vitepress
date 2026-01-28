@@ -124,7 +124,7 @@ if (__VP_LOCAL_SEARCH__) {
   })
 }
 
-// --- Moss Search (Separate Logic) ---
+// --- Moss Search ---
 if (__MOSS__) {
   const handleOpenMoss = () => {
     showSearch.value = true
