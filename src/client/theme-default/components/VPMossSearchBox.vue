@@ -73,7 +73,7 @@ let initPromise: Promise<void> | null = null
 let lastQueryToken = 0       // To track network requests
 
 // --------- Performance Profiling -----------
-const ENABLE_PROFILING = false // Set to true for debugging
+const ENABLE_PROFILING = import.meta.env.VITE_MOSS_LOG_LEVEL === 'info'
 let currentProfile: {
   query: string
   inputTime: number
