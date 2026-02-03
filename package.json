@@ -116,7 +116,7 @@
     "vue": "^3.5.24"
   },
   "devDependencies": {
-    "@moss-tools/md-indexer": "file:/Users/yatharthkapadia/Desktop/code/moss-utils/moss-md-indexer",
+    "@moss-tools/md-indexer": "1.0.0-beta.2",
     "dotenv": "^16.4.5",
     "@clack/prompts": "^1.0.0-alpha.6",
     "@iconify/utils": "^3.0.2",
