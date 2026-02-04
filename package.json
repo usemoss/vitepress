@@ -120,7 +120,6 @@
     "@clack/prompts": "^1.0.0",
     "@iconify/utils": "^3.1.0",
     "@moss-tools/md-indexer": "1.0.0-beta.2",
-    "dotenv": "^16.4.5",
     "@mdit-vue/plugin-component": "^3.0.2",
     "@mdit-vue/plugin-frontmatter": "^3.0.2",
     "@mdit-vue/plugin-headers": "^3.0.2",
