@@ -205,8 +205,8 @@ function isEditingContent(event: KeyboardEvent): boolean {
     </template>
     <template v-else-if="provider === 'local'">
       <VPNavBarSearchButton
-        text="Search"
-        aria-label="Search"
+        :text="algoliaOptions.translations?.button?.buttonText || 'Search'"
+        :aria-label="algoliaOptions.translations?.button?.buttonAriaLabel || 'Search'"
         :aria-keyshortcuts="'/ control+k meta+k'"
         @click="showSearch = true"
       />
