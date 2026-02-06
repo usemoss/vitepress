@@ -433,6 +433,12 @@ export namespace DefaultTheme {
      */
     topk?: number
 
+  /**
+   * Maximum number of matches to include per document
+   * @default 2
+   */
+  MaxMatchPerPage?: number
+
     /**
      * A subset of options for different locales.
      */
